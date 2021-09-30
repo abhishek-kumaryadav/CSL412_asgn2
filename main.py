@@ -58,69 +58,38 @@ class Graph:
                 i += 1
         return adj
 
-    # def findMinFromDict(self, nodes):
-    #     """Return node number with minimum edge to any node"""
-    #     #   maxsize works as +ve Infinity
-    #     min_key, min_val = None, sys.maxsize
-    #     for node, val in nodes.items():
-    #         if min_val > val[1]:  # val[0] is the node it is connected to
-    #             min_val = val[1]  # val[1] is cost to node val[0]
-    #             min_key = node
-    #     if min_key is None:
-    #         # print(list(nodes.keys())[0])
-    #         return list(nodes.keys())[0]  # Return first value if no value found
-    #     else:
-    #         # print(min_key)
-    #         return min_key
-
-    def findMinFromNotMst(self, lis):
-        min_val = min([l.cost for l in lis])
-        min_key = [l.node for l in lis if l.cost == min_val]
-        min_k = min(lis, key=lambda x: x.cost)
-        # print(min_key[0], min_k.node)
-        return min_k
-
     def getMST(self, nodes=None):
         mstList = list()
-        # Creates a linked list of visited set, connected parent to child node
-        notMstSet = None
+        # Creates a linked list of visited nodes, connected parent to child node
+        # notMstSet is a list of nodes which aren't in mst
         notMstList = list()
         INF = sys.maxsize
 
-        # notMstSet contains all nodes which are not visited and along with their every neighbour with it's cost
+        # notMstList contains all unvisited nodes, neighbour and cost
+        # List of NodeNotMst class is used for this purpose
         if nodes is None:
             for n in self.adjMatrix.keys():
                 notMstList.append(self.NodeNotMst(n, None, INF))
-            notMstSet = {node: (None, INF) for node in self.adjMatrix.keys()}
         else:
             for n in nodes:
                 notMstList.append(self.NodeNotMst(n, None, INF))
-            notMstSet = {node: (None, INF) for node in nodes}
 
         # Run until all nodes are in mst
         while len(notMstList) != 0:
             # Find the node which has least cost edge
-            # newNode = self.findMinFromDict(notMstSet)
-            newListNode = self.findMinFromNotMst(notMstList)
-            # print(newNode, newListNode)
-            # assert newNode == newListNode.node
-            # Remove node from notMstSet and add to mstSet
-            # gotoMst = notMstSet.pop(newNode)
-            # assert gotoMst[0] == newListNode.neighbour
+            newListNode = self.NodeNotMst.findMinFromNotMst(notMstList)
+
+            # Remove node from notMstList
             notMstList.remove(newListNode)
 
+            # Append new edge to expand MST
             mstList.append((newListNode.neighbour, newListNode.node))
-            # print(mstList)
-            # mstList.append((newNode.node,newListNode.node))
 
             # Update all edges if shorter edge found
             for b, weight in self.adjMatrix[
                 newListNode.node
-            ].items():  # Go through all edges of newly added(to mstSet) node
-                # if notMstSet.get(b, None) != None and weight < notMstSet.get(b)[1]:
-                #     # Check if nodes connected to newly added node are present in notMstSet
-                #     notMstSet[b] = (newNode, weight)
-                #     # Updating source as newNode with cost
+            ].items():  # Go through all edges of newly added(to mstList) node
+                # Updating source as newNode with cost
                 kek = [k for k in notMstList if (k.node == b and weight < k.cost)]
                 if kek:
                     kek[0].neighbour = newListNode.node
@@ -128,6 +97,10 @@ class Graph:
         return mstList
 
     class NodeNotMst:
+        """Data class for elements not in MST
+        This class has current node, neighbour node and cost
+        """
+
         def __init__(self, node, neighbour, cost):
             self.node = node
             self.cost = cost
@@ -138,31 +111,45 @@ class Graph:
                 self.node, self.neighbour, self.cost
             )
 
+        # Calculate which node has minimum cost to any other node in given list of NodeNotMst
+        @staticmethod
+        def findMinFromNotMst(lis):
+            min_k = min(lis, key=lambda x: x.cost)
+            return min_k
+
     def runAStar(self):
-        heap = []
+        heap = []  # Heap to store current lowest f value element
         heapq.heapify(heap)
         baseNode = self.Node(-1, None)  # Used to create a linked list for path
-        heapq.heappush(heap, (0, 0, 0, baseNode))
+        heapq.heappush(heap, (0, 0, 0, baseNode))  # Pushing the root/0 node in heap
 
         while heap:
             _, gLow, currentLow, parentLow = heapq.heappop(heap)
             newNode = self.Node(currentLow, parentLow)
             parentNode = newNode.parent  # Creating new node in linked list
-            path = [currentLow]
+            path = [currentLow]  # Traversing the linked list and making a path
             while parentNode.current != -1:
                 path.append(parentNode.current)
                 parentNode = parentNode.parent
 
             if len(path) - 1 == len(self.adjMatrix):
-                return path[::-1]
+                # When the salesman has travelled all nodes and returned to initial node
+                return path[::-1]  # reverse the path
             else:
+                # Create list of nodes that have not been visited yet
                 all_nodes = set([i for i in range(len(self.adjMatrix))])
                 nodes_left = sorted(list(all_nodes - set(path)))
+
+                # Get the mst edges/path for remaining nodes
                 mst_set = self.getMST(nodes_left)
+
+                # Calculate the cost of mst which is heuristic function
                 hVal = 0
                 for i1, i2 in mst_set:
                     if i1 is not None and i2 is not None:
                         hVal += self.adjMatrix[i1][i2]
+
+                # Update heap with new elements that can be reached by current popped node
                 for b, cost in self.adjMatrix[currentLow].items():
                     if b not in path:
                         fVal = hVal + cost + gLow
@@ -179,20 +166,20 @@ class Graph:
         def __lt__(lhs, rhs):
             return lhs.current < rhs.current
 
-    def dfsConnected(self, node, g, visited):
-        if visited[node]:
-            return
-        visited[node] = True
-        for i in g[node]:
-            self.dfsConnected(i[0], g, visited)
+    # def dfsConnected(self, node, g, visited):
+    #     if visited[node]:
+    #         return
+    #     visited[node] = True
+    #     for i in g[node]:
+    #         self.dfsConnected(i[0], g, visited)
 
-    def connected(self, g):
-        visited = [False for i in range(len(g))]
-        self.dfsConnected(0, g, visited)
-        for i in visited:
-            if not i:
-                return False
-        return True
+    # def connected(self, g):
+    #     visited = [False for i in range(len(g))]
+    #     self.dfsConnected(0, g, visited)
+    #     for i in visited:
+    #         if not i:
+    #             return False
+    #     return True
 
 
 def main():
